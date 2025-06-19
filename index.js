@@ -4,7 +4,7 @@ const mineflayer = require('mineflayer');
 const crypto = require('crypto');
 const { parse } = require('url');
 
-const MAX_USERS = 500;
+const MAX_USERS = 20;
 const MAX_BOTS = 20;
 const bots = {};
 const logs = {};
