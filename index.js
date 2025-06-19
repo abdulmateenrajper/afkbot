@@ -72,7 +72,7 @@ http.createServer((req, res) => {
       const user = users[username];
       if (user && user.password === password)
         return send(200, { success: true, token: username + '_token' });
-      else return send(200, { success: false, message: 'Invalid credentials' });
+      else return send(200, { success: false, message: 'Invalid credentials. Please try again or create an account.' });
     });
   }
 
@@ -129,94 +129,95 @@ http.createServer((req, res) => {
 });
 
 function renderHTML() {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>SKYBOT HOST</title>
-  <style>
-    body {
-      background: #0d0d0d;
-      color: #0f0;
-      font-family: monospace;
-      margin: 0;
-      padding: 0;
-    }
-    #top {
-      text-align: left;
-      padding: 15px;
-      font-size: 20px;
-      font-weight: bold;
-      color: white;
-    }
-    #auth, #register, #control {
-      max-width: 400px;
-      margin: 50px auto;
-      background: white;
-      color: black;
-      padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 0 20px #0f0;
-      display: none;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      border: none;
-      border-radius: 10px;
-      font-family: monospace;
-      font-size: 14px;
-    }
-    input {
-      background: #f0f0f0;
-    }
-    button {
-      background: #111;
-      color: #0f0;
-      cursor: pointer;
-      border: 1px solid #0f0;
-    }
-    button:hover {
-      background: #0f0;
-      color: black;
-    }
-    #log {
-      margin-top: 15px;
-      padding: 10px;
-      background: #000;
-      border-radius: 10px;
-      height: 200px;
-      overflow-y: scroll;
-      white-space: pre-wrap;
-      font-size: 13px;
-    }
-    .link {
-      color: #00f;
-      font-size: 12px;
-      text-align: right;
-      cursor: pointer;
-      margin-top: 5px;
-    }
-    .green { color: #0f0; }
-    .red { color: #f00; }
-  </style>
-</head>
-<body>
+  return `<!DOCTYPE html>
+<html><head><title>SKYBOT HOST</title><style>
+body {
+  background: #0d0d0d;
+  color: #0f0;
+  font-family: monospace;
+  margin: 0;
+  padding: 0;
+}
+#top {
+  text-align: left;
+  padding: 15px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+}
+#auth, #register, #control {
+  max-width: 400px;
+  margin: 30px auto;
+  background: white;
+  color: black;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 0 20px #0f0;
+  display: none;
+}
+input, button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 10px;
+  font-family: monospace;
+  font-size: 14px;
+}
+input {
+  background: #f0f0f0;
+}
+button {
+  background: #111;
+  color: #0f0;
+  cursor: pointer;
+  border: 1px solid #0f0;
+}
+button:hover {
+  background: #0f0;
+  color: black;
+}
+#log {
+  margin-top: 15px;
+  padding: 10px;
+  background: #000;
+  border-radius: 10px;
+  height: 200px;
+  overflow-y: scroll;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+.green { color: #0f0; }
+.red { color: #f00; }
+.popup {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 10px 15px;
+  border-radius: 5px;
+  font-weight: bold;
+  background-color: #222;
+  color: #fff;
+  box-shadow: 0 0 10px #0f0;
+  z-index: 9999;
+}
+.popup.error { background-color: #f00; color: white; }
+.popup.success { background-color: #0f0; color: black; }
+</style></head><body>
 <div id="top">SKYBOT HOST</div>
 
 <div id="auth">
   <input id="user" placeholder="Username">
   <input id="pass" placeholder="Password" type="password">
   <button onclick="login()">Login</button>
-  <div class="link" onclick="showRegister()">New here? Create account</div>
+  <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showRegister()" style="color:#0f0;">New here? Create account</a></p>
 </div>
 
 <div id="register">
-  <input id="reguser" placeholder="Username">
-  <input id="regpass" placeholder="Password" type="password">
-  <button onclick="register()">Register</button>
-  <div class="link" onclick="showLogin()">← Back to login</div>
+  <input id="newuser" placeholder="New Username">
+  <input id="newpass" placeholder="New Password" type="password">
+  <button onclick="register()">Create Account</button>
+  <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showLogin()" style="color:#0f0;">Already have an account? Login</a></p>
 </div>
 
 <div id="control">
@@ -231,17 +232,26 @@ function renderHTML() {
 </div>
 
 <script>
-document.getElementById('auth').style.display = 'block';
-let token = '', botId = '';
+let token = "", botId = "";
+
+function showPopup(msg, type = 'success') {
+  const div = document.createElement('div');
+  div.className = `popup ${type}`;
+  div.innerText = msg;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 3000);
+}
 
 function showRegister() {
   auth.style.display = 'none';
   register.style.display = 'block';
 }
+
 function showLogin() {
   register.style.display = 'none';
   auth.style.display = 'block';
 }
+
 function login() {
   fetch('/api/login', {
     method: 'POST',
@@ -253,21 +263,24 @@ function login() {
       uname.innerText = user.value;
       auth.style.display = 'none';
       control.style.display = 'block';
-    } else alert(d.message);
+      showPopup('✅ Logged in!', 'success');
+    } else showPopup(d.message, 'error');
   });
 }
+
 function register() {
   fetch('/api/register', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username: reguser.value, password: regpass.value })
+    body: JSON.stringify({ username: newuser.value, password: newpass.value })
   }).then(r => r.json()).then(d => {
     if (d.success) {
-      alert('✅ Registered! Please login');
+      showPopup('✅ Registered! Please log in.', 'success');
       showLogin();
-    } else alert(d.message);
+    } else showPopup(d.message, 'error');
   });
 }
+
 function startBot() {
   fetch('/api/start', {
     method: 'POST',
@@ -277,20 +290,22 @@ function startBot() {
     if (d.success) {
       botId = d.botId;
       setInterval(fetchLogs, 1000);
-    } else alert(d.message);
+    } else showPopup(d.message, 'error');
   });
 }
+
 function fetchLogs() {
   if (!botId) return;
   fetch('/api/logs?id=' + botId).then(r => r.text()).then(t => {
-    const lines = t.split('\\n').map(line =>
-      line.includes('✅') || line.includes('🟢') ? '<div class=\"green\">' + line + '</div>' :
-      line.includes('⚠️') || line.includes('🚫') || line.includes('🔁') ? '<div class=\"red\">' + line + '</div>' :
+    const lines = t.split('\n').map(line =>
+      line.includes('✅') || line.includes('🟢') ? '<div class="green">' + line + '</div>' :
+      line.includes('⚠️') || line.includes('🚫') || line.includes('🔁') ? '<div class="red">' + line + '</div>' :
       '<div>' + line + '</div>'
     );
     log.innerHTML = lines.join('');
   });
 }
+
 function sendCommand() {
   if (!botId) return;
   fetch('/api/command', {
