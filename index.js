@@ -236,7 +236,7 @@ let token = "", botId = "";
 
 function showPopup(msg, type = 'success') {
   const div = document.createElement('div');
-  div.className = `popup ${type}`;
+  div.className = 'popup ' + type;
   div.innerText = msg;
   document.body.appendChild(div);
   setTimeout(() => div.remove(), 3000);
@@ -316,6 +316,26 @@ function sendCommand() {
   cmd.value = '';
 }
 </script>
+<div style="text-align:center; margin: 40px 0;">
+  <a href="https://discord.gg/hsJmmvYpCG" target="_blank" style="
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 25px;
+    background: #5865F2;
+    color: white;
+    font-weight: bold;
+    font-family: monospace;
+    border-radius: 12px;
+    text-decoration: none;
+    box-shadow: 0 0 10px #5865F2;
+    font-size: 18px;
+  ">
+    <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg" style="height:24px; filter: invert(1);">
+    Join our Discord
+  </a>
+</div>
+
 </body>
 </html>`;
 }
