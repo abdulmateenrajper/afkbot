@@ -130,106 +130,139 @@ http.createServer((req, res) => {
 
 function renderHTML() {
   return `<!DOCTYPE html>
-<html><head><title>SKYBOT HOST</title><style>
-body {
-  background: #0d0d0d;
-  color: #0f0;
-  font-family: monospace;
-  margin: 0;
-  padding: 0;
-}
-#top {
-  text-align: left;
-  padding: 15px;
-  font-size: 20px;
-  font-weight: bold;
-  color: white;
-}
-#auth, #register, #control {
-  max-width: 400px;
-  margin: 30px auto;
-  background: white;
-  color: black;
-  padding: 20px;
-  border-radius: 15px;
-  box-shadow: 0 0 20px #0f0;
-  display: none;
-}
-input, button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border: none;
-  border-radius: 10px;
-  font-family: monospace;
-  font-size: 14px;
-}
-input {
-  background: #f0f0f0;
-}
-button {
-  background: #111;
-  color: #0f0;
-  cursor: pointer;
-  border: 1px solid #0f0;
-}
-button:hover {
-  background: #0f0;
-  color: black;
-}
-#log {
-  margin-top: 15px;
-  padding: 10px;
-  background: #000;
-  border-radius: 10px;
-  height: 200px;
-  overflow-y: scroll;
-  white-space: pre-wrap;
-  font-size: 13px;
-}
-.green { color: #0f0; }
-.red { color: #f00; }
-.popup {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  padding: 10px 15px;
-  border-radius: 5px;
-  font-weight: bold;
-  background-color: #222;
-  color: #fff;
-  box-shadow: 0 0 10px #0f0;
-  z-index: 9999;
-}
-.popup.error { background-color: #f00; color: white; }
-.popup.success { background-color: #0f0; color: black; }
-</style></head><body>
-<div id="top">SKYBOT HOST</div>
+<html>
+<head>
+  <title>SKYBOT HOST</title>
+  <style>
+    body {
+      background: #0d0d0d;
+      color: #0f0;
+      font-family: monospace;
+      margin: 0;
+      padding: 0;
+    }
+    #top {
+      text-align: left;
+      padding: 15px;
+      font-size: 20px;
+      font-weight: bold;
+      color: white;
+    }
+    #auth, #register, #control {
+      max-width: 400px;
+      margin: 30px auto;
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 0 20px #0f0;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 10px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    input {
+      background: #f0f0f0;
+    }
+    button {
+      background: #111;
+      color: #0f0;
+      cursor: pointer;
+      border: 1px solid #0f0;
+    }
+    button:hover {
+      background: #0f0;
+      color: black;
+    }
+    #log {
+      margin-top: 15px;
+      padding: 10px;
+      background: #000;
+      border-radius: 10px;
+      height: 200px;
+      overflow-y: scroll;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+    .green { color: #0f0; }
+    .red { color: #f00; }
+    .popup {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-weight: bold;
+      background-color: #222;
+      color: #fff;
+      box-shadow: 0 0 10px #0f0;
+      z-index: 9999;
+    }
+    .popup.error { background-color: #f00; color: white; }
+    .popup.success { background-color: #0f0; color: black; }
+    .discord-button {
+      text-align: center;
+      margin: 50px 0;
+    }
+    .discord-button a {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px 25px;
+      background: #5865F2;
+      color: white;
+      font-weight: bold;
+      font-family: monospace;
+      border-radius: 12px;
+      text-decoration: none;
+      box-shadow: 0 0 10px #5865F2;
+      font-size: 18px;
+    }
+    .discord-button img {
+      height: 24px;
+      filter: invert(1);
+    }
+  </style>
+</head>
+<body>
+  <div id="top">SKYBOT HOST</div>
 
-<div id="auth">
-  <input id="user" placeholder="Username">
-  <input id="pass" placeholder="Password" type="password">
-  <button onclick="login()">Login</button>
-  <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showRegister()" style="color:#0f0;">New here? Create account</a></p>
-</div>
+  <div id="auth">
+    <input id="user" placeholder="Username">
+    <input id="pass" placeholder="Password" type="password">
+    <button onclick="login()">Login</button>
+    <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showRegister()" style="color:#0f0;">New here? Create account</a></p>
+  </div>
 
-<div id="register">
-  <input id="newuser" placeholder="New Username">
-  <input id="newpass" placeholder="New Password" type="password">
-  <button onclick="register()">Create Account</button>
-  <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showLogin()" style="color:#0f0;">Already have an account? Login</a></p>
-</div>
+  <div id="register" style="display:none;">
+    <input id="newuser" placeholder="New Username">
+    <input id="newpass" placeholder="New Password" type="password">
+    <button onclick="register()">Create Account</button>
+    <p style="text-align:center; margin-top:10px;"><a href="#" onclick="showLogin()" style="color:#0f0;">Already have an account? Login</a></p>
+  </div>
 
-<div id="control">
-  <p>Welcome, <span id="uname"></span>!</p>
-  <input id="ip" placeholder="IP">
-  <input id="port" placeholder="Port">
-  <input id="bot" placeholder="Bot Name">
-  <button onclick="startBot()">Start Bot</button>
-  <input id="cmd" placeholder="Command">
-  <button onclick="sendCommand()">Send</button>
-  <div id="log">Logs...</div>
-</div>
+  <div id="control" style="display:none;">
+    <p>Welcome, <span id="uname"></span>!</p>
+    <input id="ip" placeholder="IP">
+    <input id="port" placeholder="Port">
+    <input id="bot" placeholder="Bot Name">
+    <button onclick="startBot()">Start Bot</button>
+    <input id="cmd" placeholder="Command">
+    <button onclick="sendCommand()">Send</button>
+    <div id="log">Logs...</div>
+  </div>
+
+  <div class="discord-button">
+    <a href="https://discord.gg/your-invite" target="_blank">
+      <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg">
+      Join our Discord
+    </a>
+  </div>
 
 <script>
 let token = "", botId = "";
@@ -243,13 +276,13 @@ function showPopup(msg, type = 'success') {
 }
 
 function showRegister() {
-  auth.style.display = 'none';
-  register.style.display = 'block';
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('register').style.display = 'block';
 }
 
 function showLogin() {
-  register.style.display = 'none';
-  auth.style.display = 'block';
+  document.getElementById('register').style.display = 'none';
+  document.getElementById('auth').style.display = 'block';
 }
 
 function login() {
@@ -297,12 +330,12 @@ function startBot() {
 function fetchLogs() {
   if (!botId) return;
   fetch('/api/logs?id=' + botId).then(r => r.text()).then(t => {
-    const lines = t.split('\n').map(line =>
+    const lines = t.split('\\n').map(line =>
       line.includes('✅') || line.includes('🟢') ? '<div class="green">' + line + '</div>' :
-      line.includes('⚠️') || line.includes('🚫') || line.includes('🔁') ? '<div class="red">' + line + '</div>' :
+      line.includes('⚠️') || line.includes('⛔') || line.includes('🔁') ? '<div class="red">' + line + '</div>' :
       '<div>' + line + '</div>'
     );
-    log.innerHTML = lines.join('');
+    document.getElementById('log').innerHTML = lines.join('');
   });
 }
 
@@ -316,26 +349,6 @@ function sendCommand() {
   cmd.value = '';
 }
 </script>
-<div style="text-align:center; margin: 40px 0;">
-  <a href="https://discord.gg/hsJmmvYpCG" target="_blank" style="
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 15px 25px;
-    background: #5865F2;
-    color: white;
-    font-weight: bold;
-    font-family: monospace;
-    border-radius: 12px;
-    text-decoration: none;
-    box-shadow: 0 0 10px #5865F2;
-    font-size: 18px;
-  ">
-    <img src="https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/discord.svg" style="height:24px; filter: invert(1);">
-    Join our Discord
-  </a>
-</div>
-
 </body>
 </html>`;
 }
