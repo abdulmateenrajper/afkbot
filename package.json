@@ -1,0 +1,12 @@
+{
+  "name": "skybot-host",
+  "version": "1.0.0",
+  "description": "SKYBOT hosting panel",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mineflayer": "^4.17.1"
+  }
+}
