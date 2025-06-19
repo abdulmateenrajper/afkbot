@@ -295,15 +295,12 @@ function sendCommand() {
   if (!botId) return;
   fetch('/api/command', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ botId, command: cmd.value })
   });
   cmd.value = '';
 }
 </script>
-</body></html>`;
-}
-
-}
-</script></body></html>`;
+</body>
+</html>`;
 }
