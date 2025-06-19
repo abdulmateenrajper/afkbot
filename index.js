@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { parse } = require('url');
 
 const MAX_USERS = 500;
-const MAX_BOTS = 20;
+const MAX_BOTS = 500;
 const bots = {};
 const logs = {};
 const users = fs.existsSync('users.json') ? JSON.parse(fs.readFileSync('users.json')) : {};
