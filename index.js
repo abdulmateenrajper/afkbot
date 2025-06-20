@@ -1,5 +1,6 @@
 const { execSync } = require("child_process");
 
+// 📦 Auto-install mineflayer
 const mineflayer = (() => {
   try { return require("mineflayer"); }
   catch (e) {
@@ -9,10 +10,11 @@ const mineflayer = (() => {
   }
 })();
 
+// === CONFIG ===
 const HOST = "bhrata.aternos.me";
 const PORT = 14495;
 
-// === Start Bot ===
+// === Auto-launch Real Bot ===
 function launchBot() {
   const botName = "SKYBOT_" + Math.floor(1000 + Math.random() * 9000);
   console.log(`🚀 Launching bot: ${botName}`);
@@ -46,7 +48,7 @@ function launchBot() {
   });
 }
 
-// === Movement (AFK Simulation) ===
+// === Movement Simulation (AFK)
 function startMovement(bot) {
   const moves = ["forward", "back", "left", "right"];
   let moving = false;
@@ -77,5 +79,13 @@ function startMovement(bot) {
   }, 5000);
 }
 
-// === Start the bot loop ===
+// === Fake Port for Render & Hosting ===
+require("http").createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("SKYBOT is online\n");
+}).listen(process.env.PORT || 3000, () => {
+  console.log("🌐 Fake HTTP port opened to keep host alive.");
+});
+
+// 🚀 Start Bot
 launchBot();
