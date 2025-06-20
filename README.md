@@ -1,39 +1,32 @@
-# 🛌 Minecraft AFK Bot for Aternos Servers
+# SKYBOT Multi-Server Bot + Web Panel
 
-Stay online 24/7 in any cracked Minecraft server (like Aternos) using this Node.js-based AFK bot powered by `mineflayer`.
-
-✅ Auto-registers using LoginSecurity  
-✅ Auto-logins after reconnect  
-✅ Auto-reconnects if kicked or disconnected  
-✅ 100% FREE using [Render](https://render.com)
+This project uses [Mineflayer](https://github.com/PrismarineJS/mineflayer) to launch up to 5 Minecraft bots — each connecting to a different server — with an integrated web panel for easy control.
 
 ---
 
-### 👑 Created by: [@iamgunpoint69](https://www.youtube.com/@iamgunpoint69)
+## 🚀 Features
 
-Subscribe on YouTube for more Minecraft bots, hacks, and plugins!
+- 🖥️ Web panel with 5 individual IP/Port input forms
+- 🎮 Bots auto-join and simulate AFK movement
+- 🔁 Auto-reconnect on kick/disconnect
+- 🔀 Random bot usernames (`SKYBOT_XXXX`)
+- 🌐 HTTP server keeps it alive on hosts like **Render** or **Replit**
 
 ---
 
-## 🚀 How to Deploy this Bot on Render (100% FREE)
+## 🔧 Requirements
 
-### 🔧 Step-by-step Instructions:
+- Node.js (v16 or higher)
+- Minecraft servers that allow cracked clients (if not using a Mojang/Microsoft account)
 
-#### 1. **Create a Render Account**
-👉 Go to [https://render.com](https://render.com)  
-👉 Click **"Sign Up"** and connect your GitHub account
+---
 
-#### 2. **Fork this Repo**
-Click the **"Fork"** button (top-right) on GitHub to create your own copy of this repo.
+## 🛠 Setup
 
-#### 3. **Edit Bot Settings**
-Go to `afk_bot.js` in your forked repo and edit this section:
+1. **Install dependencies** (Mineflayer auto-installs on first run)
 
-```js
-const bot = mineflayer.createBot({
-  host: 'YOUR.SERVER.IP',
-  port: YOUR_PORT,
-  username: 'BOT_USERNAME'
-});
+2. Create a file named `index.js` and paste the full code from this repo.
 
-const PASSWORD = 'YourPassword123';
+3. Run the server:
+```bash
+node index.js
