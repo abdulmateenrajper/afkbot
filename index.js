@@ -16,7 +16,6 @@ const DATA_FILE = "button_data.json";
 let usedButtons = Array(5).fill(false);
 let botDetails = Array(5).fill(null);
 
-// Try to load saved data
 try {
   if (fs.existsSync(DATA_FILE)) {
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
@@ -30,7 +29,6 @@ try {
   console.error("❌ Failed to load saved state:", err);
 }
 
-// Save state
 function saveButtonData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ usedButtons, botDetails }, null, 2));
 }
@@ -41,46 +39,41 @@ function isValidHost(ip) {
   return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ip);
 }
 
-function launchBot(host, port, botId = 0) {
+function launchBot(host, port, botId = 0, attempt = 0) {
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
-  console.log(`🚀 Launching bot ${botName} on ${host}:${port}`);
+  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1})`);
 
-  let reconnectTries = 0;
+  const bot = mineflayer.createBot({ host, port, username: botName });
+  activeBots.push(bot);
 
-  function connect() {
-    const bot = mineflayer.createBot({ host, port, username: botName });
+  bot.on("login", () => {
+    console.log(`✅ [${botName}] Logged in.`);
+  });
 
-    bot.on("login", () => {
-      console.log(`✅ [${botName}] Logged in.`);
-      reconnectTries = 0;
-    });
+  bot.on("spawn", () => {
+    console.log(`🎮 [${botName}] Spawned.`);
+    startMovement(bot);
+  });
 
-    bot.on("spawn", () => {
-      console.log(`🎮 [${botName}] Spawned.`);
-      startMovement(bot);
-    });
-
-    bot.on("end", () => {
-      console.log(`🔁 [${botName}] Disconnected. Rejoining in 3s...`);
-      setTimeout(connect, 3000);
-    });
-
-    bot.on("kicked", reason => {
-      console.log(`⛔ [${botName}] Kicked: ${reason}`);
-    });
-
-    bot.on("error", err => {
-      console.log(`❌ [${botName}] Error: ${err.message}`);
-      reconnectTries++;
-      if (reconnectTries < 5) {
-        setTimeout(connect, 3000);
+  bot.on("end", () => {
+    console.log(`🔁 [${botName}] Disconnected.`);
+    setTimeout(() => {
+      if (attempt >= 5) {
+        console.log(`🔄 [${botName}] Too many failures. Restarting with new ID...`);
+        launchBot(host, port, botId, 0); // New bot with new ID
       } else {
-        console.log(`❌ [${botName}] Failed after 5 retries.`);
+        launchBot(host, port, botId, attempt + 1); // Retry
       }
-    });
-  }
+    }, 1000);
+  });
 
-  connect();
+  bot.on("kicked", reason => {
+    console.log(`⛔ [${botName}] Kicked: ${reason}`);
+  });
+
+  bot.on("error", err => {
+    console.log(`❌ [${botName}] Error: ${err.message}`);
+  });
 }
 
 function startMovement(bot) {
@@ -109,7 +102,6 @@ function startMovement(bot) {
   }, 5000);
 }
 
-// ✅ Web server with confirmation page
 http.createServer((req, res) => {
   if (req.method === "GET") {
     const html = `<!DOCTYPE html>
@@ -165,13 +157,12 @@ http.createServer((req, res) => {
 
         launchBot(ip, port, index);
 
-        // Confirmation page
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end(`<!DOCTYPE html>
 <html>
   <head><title>Bot Launched</title></head>
   <body style="background:#111;color:#0f0;font-family:sans-serif;text-align:center;padding-top:20vh;">
-    <h1>🚀 Bot Launched!</h1>
+    <h1>✅ Bot Launched!</h1>
     <p>Bot <strong>${botName}</strong> is connecting to:</p>
     <p><code>${ip}:${port}</code></p>
     <a href="/" style="color:cyan;text-decoration:underline;">← Go back</a>
