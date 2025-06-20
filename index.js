@@ -13,9 +13,10 @@ const mineflayer = (() => {
 })();
 
 const DATA_FILE = "button_data.json";
-let usedButtons = Array(5).fill(false);
-let botDetails = Array(5).fill(null);
+let usedButtons = Array(10).fill(false);
+let botDetails = Array(10).fill(null);
 
+// Load previous state
 try {
   if (fs.existsSync(DATA_FILE)) {
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
@@ -39,17 +40,14 @@ function isValidHost(ip) {
   return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ip);
 }
 
-function launchBot(host, port, botId = 0, attempt = 0) {
+function launchBot(host, port, botId = 0, attempt = 0, totalFailures = 0) {
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
-  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1})`);
+  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1}, total fails: ${totalFailures})`);
 
   const bot = mineflayer.createBot({ host, port, username: botName });
   activeBots.push(bot);
 
-  bot.on("login", () => {
-    console.log(`✅ [${botName}] Logged in.`);
-  });
-
+  bot.on("login", () => console.log(`✅ [${botName}] Logged in.`));
   bot.on("spawn", () => {
     console.log(`🎮 [${botName}] Spawned.`);
     startMovement(bot);
@@ -58,22 +56,21 @@ function launchBot(host, port, botId = 0, attempt = 0) {
   bot.on("end", () => {
     console.log(`🔁 [${botName}] Disconnected.`);
     setTimeout(() => {
-      if (attempt >= 5) {
-        console.log(`🔄 [${botName}] Too many failures. Restarting with new ID...`);
-        launchBot(host, port, botId, 0); // New bot with new ID
+      if (totalFailures >= 10) {
+        console.log(`❌ [${botName}] Gave up after 10 failures.`);
+        usedButtons[botId] = false;
+        botDetails[botId] = null;
+        saveButtonData();
+      } else if (attempt >= 5) {
+        launchBot(host, port, botId, 0, totalFailures + 1); // Retry with new bot
       } else {
-        launchBot(host, port, botId, attempt + 1); // Retry
+        launchBot(host, port, botId, attempt + 1, totalFailures + 1); // Retry
       }
     }, 1000);
   });
 
-  bot.on("kicked", reason => {
-    console.log(`⛔ [${botName}] Kicked: ${reason}`);
-  });
-
-  bot.on("error", err => {
-    console.log(`❌ [${botName}] Error: ${err.message}`);
-  });
+  bot.on("kicked", reason => console.log(`⛔ [${botName}] Kicked: ${reason}`));
+  bot.on("error", err => console.log(`❌ [${botName}] Error: ${err.message}`));
 }
 
 function startMovement(bot) {
@@ -124,7 +121,7 @@ http.createServer((req, res) => {
 </head>
 <body>
   <h1>🚀 SKYBOT Launcher</h1>
-  ${Array.from({ length: 5 }).map((_, i) => `
+  ${Array.from({ length: 10 }).map((_, i) => `
     <form method="POST">
       <input name="ip${i}" placeholder="IP ${i + 1}" required>
       <input name="port${i}" placeholder="Port ${i + 1}" required>
@@ -137,7 +134,6 @@ http.createServer((req, res) => {
 </html>`;
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(html);
-
   } else if (req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
@@ -147,7 +143,7 @@ http.createServer((req, res) => {
       const ip = params.get(`ip${index}`);
       const port = parseInt(params.get(`port${index}`));
 
-      console.log(`🌐 User input: Bot ${index} to ${ip}:${port}`);
+      console.log(`🌐 User input: Bot ${index} → ${ip}:${port}`);
 
       if (!usedButtons[index] && ip && port && isValidHost(ip)) {
         const botName = `SKYBOT_${index}_${Math.floor(1000 + Math.random() * 9000)}`;
