@@ -17,7 +17,7 @@ const DATA_FILE = "button_data.json";
 let usedButtons = Array(BOT_LIMIT).fill(false);
 let botDetails = Array(BOT_LIMIT).fill(null);
 let activeBots = Array(BOT_LIMIT).fill(null);
-let botStatus = Array(BOT_LIMIT).fill("🔴");
+let botStatus = Array(BOT_LIMIT).fill("off");
 
 const IP_BLACKLIST = ["127.0.0.1", "localhost", "0.0.0.0"];
 
@@ -28,6 +28,10 @@ function isIpPortFormat(input) {
 function isBlacklisted(ipPort) {
   const host = ipPort.split(":")[0];
   return IP_BLACKLIST.includes(host);
+}
+
+function isDuplicate(ipPort, index) {
+  return botDetails.some((b, i) => b?.ip === ipPort && i !== index);
 }
 
 try {
@@ -49,9 +53,7 @@ function saveButtonData() {
 
 function parseHost(input) {
   const parts = input.split(":");
-  const host = parts[0];
-  const port = parseInt(parts[1]);
-  return { host, port };
+  return { host: parts[0], port: parseInt(parts[1]) };
 }
 
 function launchBot(ipPort, botId = 0, attempt = 0, totalFailures = 0) {
@@ -64,20 +66,20 @@ function launchBot(ipPort, botId = 0, attempt = 0, totalFailures = 0) {
 
   bot.on("login", () => {
     console.log(`✅ [${botName}] Logged in.`);
-    botStatus[botId] = "🟢";
+    botStatus[botId] = "on";
   });
 
   bot.on("spawn", () => startMovement(bot));
 
   bot.on("end", () => {
-    botStatus[botId] = "🔴";
+    botStatus[botId] = "off";
     setTimeout(() => {
       if (totalFailures >= 10) {
         usedButtons[botId] = false;
         botDetails[botId] = null;
         activeBots[botId] = null;
         saveButtonData();
-        console.log(`❌ [${botName}] Gave up after 10 failures.`);
+        console.log(`❌ [${botName}] Gave up after 10 failures. Button reset.`);
       } else if (attempt >= 5) {
         launchBot(ipPort, botId, 0, totalFailures + 1);
       } else {
@@ -117,13 +119,12 @@ function startMovement(bot) {
 }
 
 http.createServer((req, res) => {
-  if (req.method === "GET") {
+  if (req.method === "GET" && req.url === "/") {
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>SKYBOT Java Edition Panel</title>
+  <title>SKYBOT Panel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="5"> <!-- Auto-refresh -->
   <style>
     body { background: #111; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
     form { margin: 10px auto; max-width: 300px; background: #222; padding: 15px; border-radius: 8px; }
@@ -134,14 +135,33 @@ http.createServer((req, res) => {
     button:disabled { background: gray; color: #222; cursor: not-allowed; }
     .btn { background: #333; color: white; cursor: pointer; }
     .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    img.status { width: 16px; vertical-align: middle; }
   </style>
+  <script>
+    async function refreshStatus() {
+      const res = await fetch("/status");
+      const data = await res.json();
+      data.status.forEach((stat, i) => {
+        document.getElementById("status" + i).src = stat === "on" 
+          ? "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Yes_Check_Circle.svg/32px-Yes_Check_Circle.svg.png" 
+          : "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Close_icon_red.svg/32px-Close_icon_red.svg.png";
+        document.getElementById("ip" + i).textContent = data.details[i]?.ip || '—';
+      });
+    }
+    setInterval(refreshStatus, 4000);
+    window.onload = refreshStatus;
+  </script>
 </head>
 <body>
-  <h1>🚀 SKYBOT Java Edition Launcher</h1>
+  <h1>🚀 SKYBOT Java Edition Panel</h1>
   ${Array.from({ length: BOT_LIMIT }).map((_, i) => `
     <form method="POST">
-      <p>Status: ${botStatus[i]} ${botDetails[i]?.ip || '—'}</p>
-      <input name="ip${i}" placeholder="IP:Port for Bot ${i + 1}" value="${botDetails[i]?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
+      <p><img id="status${i}" class="status" src="${botStatus[i] === 'on'
+        ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Yes_Check_Circle.svg/32px-Yes_Check_Circle.svg.png'
+        : 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Close_icon_red.svg/32px-Close_icon_red.svg.png'}">
+        <span id="ip${i}">${botDetails[i]?.ip || '—'}</span>
+      </p>
+      <input name="ip${i}" placeholder="IP:Port" value="${botDetails[i]?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
       <div class="row">
         ${!usedButtons[i] ? `
           <button class="btn" type="submit" name="action" value="launch_${i}">Send Bot</button>
@@ -158,7 +178,12 @@ http.createServer((req, res) => {
     res.end(html);
   }
 
-  if (req.method === "POST") {
+  else if (req.url === "/status") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: botStatus, details: botDetails }));
+  }
+
+  else if (req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", () => {
@@ -168,8 +193,8 @@ http.createServer((req, res) => {
       const index = parseInt(idx);
       const ip = params.get(`ip${index}`);
 
-      if (!isIpPortFormat(ip) || isBlacklisted(ip)) {
-        console.log(`❌ Rejected unsafe or invalid IP: ${ip}`);
+      if (!isIpPortFormat(ip) || isBlacklisted(ip) || isDuplicate(ip, index)) {
+        console.log(`❌ Rejected IP: ${ip}`);
         res.writeHead(302, { Location: "/" });
         return res.end();
       }
@@ -182,7 +207,6 @@ http.createServer((req, res) => {
       }
 
       if (type === "edit") {
-        console.log(`✏️ Editing bot ${index} to ${ip}`);
         if (activeBots[index]) activeBots[index].quit();
         botDetails[index] = { ip };
         saveButtonData();
@@ -190,11 +214,10 @@ http.createServer((req, res) => {
       }
 
       if (type === "cancel") {
-        console.log(`🛑 Cancelled bot ${index}`);
         if (activeBots[index]) activeBots[index].quit();
         usedButtons[index] = false;
         botDetails[index] = null;
-        botStatus[index] = "🔴";
+        botStatus[index] = "off";
         activeBots[index] = null;
         saveButtonData();
       }
@@ -204,5 +227,5 @@ http.createServer((req, res) => {
     });
   }
 }).listen(PORT, () => {
-  console.log(`🌐 SKYBOT Panel running at http://localhost:${PORT}`);
+  console.log(`🌐 SKYBOT running on http://localhost:${PORT}`);
 });
