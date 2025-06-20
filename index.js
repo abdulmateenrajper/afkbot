@@ -13,10 +13,9 @@ const mineflayer = (() => {
 })();
 
 const DATA_FILE = "button_data.json";
-let usedButtons = Array(10).fill(false);
-let botDetails = Array(10).fill(null);
+let usedButtons = Array(5).fill(false);
+let botDetails = Array(5).fill(null);
 
-// Load saved state
 try {
   if (fs.existsSync(DATA_FILE)) {
     const data = JSON.parse(fs.readFileSync(DATA_FILE));
@@ -34,7 +33,6 @@ function saveButtonData() {
 const activeBots = [];
 
 function isValidHost(ip) {
-  // Simple hostname validation
   return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ip);
 }
 
@@ -93,7 +91,6 @@ function startMovement(bot) {
   }, 5000);
 }
 
-// === HTML Panel ===
 http.createServer((req, res) => {
   if (req.method === "GET") {
     const html = `<!DOCTYPE html>
@@ -116,7 +113,7 @@ http.createServer((req, res) => {
 </head>
 <body>
   <h1>SKYBOT Launcher</h1>
-  ${Array.from({ length: 10 }).map((_, i) => `
+  ${Array.from({ length: 5 }).map((_, i) => `
     <form method="POST">
       <input name="ip${i}" placeholder="IP ${i+1}" required>
       <input name="port${i}" placeholder="Port ${i+1}" required>
