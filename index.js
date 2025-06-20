@@ -12,10 +12,23 @@ const mineflayer = (() => {
   }
 })();
 
+const BOT_LIMIT = 5;
 const DATA_FILE = "button_data.json";
-let usedButtons = Array(10).fill(false);
-let botDetails = Array(10).fill(null);
-let activeBots = Array(10).fill(null);
+let usedButtons = Array(BOT_LIMIT).fill(false);
+let botDetails = Array(BOT_LIMIT).fill(null);
+let activeBots = Array(BOT_LIMIT).fill(null);
+let botStatus = Array(BOT_LIMIT).fill("🔴");
+
+const IP_BLACKLIST = ["127.0.0.1", "localhost", "0.0.0.0"];
+
+function isIpPortFormat(input) {
+  return /^[a-zA-Z0-9.-]+:\d+$/.test(input);
+}
+
+function isBlacklisted(ipPort) {
+  const host = ipPort.split(":")[0];
+  return IP_BLACKLIST.includes(host);
+}
 
 try {
   if (fs.existsSync(DATA_FILE)) {
@@ -34,10 +47,6 @@ function saveButtonData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ usedButtons, botDetails }, null, 2));
 }
 
-function isIpPortFormat(input) {
-  return /^[a-zA-Z0-9.-]+:\d+$/.test(input);
-}
-
 function parseHost(input) {
   const parts = input.split(":");
   const host = parts[0];
@@ -48,23 +57,27 @@ function parseHost(input) {
 function launchBot(ipPort, botId = 0, attempt = 0, totalFailures = 0) {
   const { host, port } = parseHost(ipPort);
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
-  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1}, total fails: ${totalFailures})`);
+  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1}, fails: ${totalFailures})`);
 
   const bot = mineflayer.createBot({ host, port, username: botName });
   activeBots[botId] = bot;
 
-  bot.on("login", () => console.log(`✅ [${botName}] Logged in.`));
+  bot.on("login", () => {
+    console.log(`✅ [${botName}] Logged in.`);
+    botStatus[botId] = "🟢";
+  });
+
   bot.on("spawn", () => startMovement(bot));
 
   bot.on("end", () => {
-    console.log(`🔁 [${botName}] Disconnected.`);
+    botStatus[botId] = "🔴";
     setTimeout(() => {
       if (totalFailures >= 10) {
-        console.log(`❌ [${botName}] Gave up after 10 failures.`);
         usedButtons[botId] = false;
         botDetails[botId] = null;
         activeBots[botId] = null;
         saveButtonData();
+        console.log(`❌ [${botName}] Gave up after 10 failures.`);
       } else if (attempt >= 5) {
         launchBot(ipPort, botId, 0, totalFailures + 1);
       } else {
@@ -110,6 +123,7 @@ http.createServer((req, res) => {
 <head>
   <title>SKYBOT Java Edition Panel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="5"> <!-- Auto-refresh -->
   <style>
     body { background: #111; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
     form { margin: 10px auto; max-width: 300px; background: #222; padding: 15px; border-radius: 8px; }
@@ -124,8 +138,9 @@ http.createServer((req, res) => {
 </head>
 <body>
   <h1>🚀 SKYBOT Java Edition Launcher</h1>
-  ${Array.from({ length: 10 }).map((_, i) => `
+  ${Array.from({ length: BOT_LIMIT }).map((_, i) => `
     <form method="POST">
+      <p>Status: ${botStatus[i]} ${botDetails[i]?.ip || '—'}</p>
       <input name="ip${i}" placeholder="IP:Port for Bot ${i + 1}" value="${botDetails[i]?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
       <div class="row">
         ${!usedButtons[i] ? `
@@ -153,14 +168,20 @@ http.createServer((req, res) => {
       const index = parseInt(idx);
       const ip = params.get(`ip${index}`);
 
-      if (type === "launch" && !usedButtons[index] && ip && isIpPortFormat(ip)) {
+      if (!isIpPortFormat(ip) || isBlacklisted(ip)) {
+        console.log(`❌ Rejected unsafe or invalid IP: ${ip}`);
+        res.writeHead(302, { Location: "/" });
+        return res.end();
+      }
+
+      if (type === "launch" && !usedButtons[index]) {
         usedButtons[index] = true;
         botDetails[index] = { ip };
         saveButtonData();
         launchBot(ip, index);
       }
 
-      if (type === "edit" && ip && isIpPortFormat(ip)) {
+      if (type === "edit") {
         console.log(`✏️ Editing bot ${index} to ${ip}`);
         if (activeBots[index]) activeBots[index].quit();
         botDetails[index] = { ip };
@@ -173,6 +194,7 @@ http.createServer((req, res) => {
         if (activeBots[index]) activeBots[index].quit();
         usedButtons[index] = false;
         botDetails[index] = null;
+        botStatus[index] = "🔴";
         activeBots[index] = null;
         saveButtonData();
       }
