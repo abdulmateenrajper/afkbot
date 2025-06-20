@@ -15,8 +15,8 @@ const mineflayer = (() => {
 const DATA_FILE = "button_data.json";
 let usedButtons = Array(10).fill(false);
 let botDetails = Array(10).fill(null);
+let activeBots = Array(10).fill(null);
 
-// Load previous state
 try {
   if (fs.existsSync(DATA_FILE)) {
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
@@ -34,24 +34,27 @@ function saveButtonData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ usedButtons, botDetails }, null, 2));
 }
 
-const activeBots = [];
-
-function isValidHost(ip) {
-  return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ip);
+function isIpPortFormat(input) {
+  return /^[a-zA-Z0-9.-]+:\d+$/.test(input);
 }
 
-function launchBot(host, port, botId = 0, attempt = 0, totalFailures = 0) {
+function parseHost(input) {
+  const parts = input.split(":");
+  const host = parts[0];
+  const port = parseInt(parts[1]);
+  return { host, port };
+}
+
+function launchBot(ipPort, botId = 0, attempt = 0, totalFailures = 0) {
+  const { host, port } = parseHost(ipPort);
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
   console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1}, total fails: ${totalFailures})`);
 
   const bot = mineflayer.createBot({ host, port, username: botName });
-  activeBots.push(bot);
+  activeBots[botId] = bot;
 
   bot.on("login", () => console.log(`✅ [${botName}] Logged in.`));
-  bot.on("spawn", () => {
-    console.log(`🎮 [${botName}] Spawned.`);
-    startMovement(bot);
-  });
+  bot.on("spawn", () => startMovement(bot));
 
   bot.on("end", () => {
     console.log(`🔁 [${botName}] Disconnected.`);
@@ -60,11 +63,12 @@ function launchBot(host, port, botId = 0, attempt = 0, totalFailures = 0) {
         console.log(`❌ [${botName}] Gave up after 10 failures.`);
         usedButtons[botId] = false;
         botDetails[botId] = null;
+        activeBots[botId] = null;
         saveButtonData();
       } else if (attempt >= 5) {
-        launchBot(host, port, botId, 0, totalFailures + 1); // Retry with new bot
+        launchBot(ipPort, botId, 0, totalFailures + 1);
       } else {
-        launchBot(host, port, botId, attempt + 1, totalFailures + 1); // Retry
+        launchBot(ipPort, botId, attempt + 1, totalFailures + 1);
       }
     }, 1000);
   });
@@ -104,72 +108,79 @@ http.createServer((req, res) => {
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>SKYBOT Panel</title>
+  <title>SKYBOT Java Edition Panel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { background: #111; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
-    form { margin: 10px auto; max-width: 300px; }
+    form { margin: 10px auto; max-width: 300px; background: #222; padding: 15px; border-radius: 8px; }
     input, button {
       width: 90%; padding: 10px; margin: 5px 0;
       border: none; border-radius: 5px;
     }
     button:disabled { background: gray; color: #222; cursor: not-allowed; }
-    @media (min-width: 600px) {
-      form { display: inline-block; margin: 15px; }
-    }
+    .btn { background: #333; color: white; cursor: pointer; }
+    .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <h1>🚀 SKYBOT Launcher</h1>
+  <h1>🚀 SKYBOT Java Edition Launcher</h1>
   ${Array.from({ length: 10 }).map((_, i) => `
     <form method="POST">
-      <input name="ip${i}" placeholder="IP ${i + 1}" required>
-      <input name="port${i}" placeholder="Port ${i + 1}" required>
-      <button type="submit" name="botIndex" value="${i}" ${usedButtons[i] ? 'disabled' : ''}>
-        ${usedButtons[i] ? 'Used (' + (botDetails[i]?.name || '?') + ')' : `Send Bot ${i + 1}`}
-      </button>
+      <input name="ip${i}" placeholder="IP:Port for Bot ${i + 1}" value="${botDetails[i]?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
+      <div class="row">
+        ${!usedButtons[i] ? `
+          <button class="btn" type="submit" name="action" value="launch_${i}">Send Bot</button>
+        ` : `
+          <button class="btn" type="submit" name="action" value="edit_${i}">Edit</button>
+          <button class="btn" type="submit" name="action" value="cancel_${i}">Cancel</button>
+        `}
+      </div>
     </form>
   `).join('')}
 </body>
 </html>`;
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(html);
-  } else if (req.method === "POST") {
+  }
+
+  if (req.method === "POST") {
     let body = "";
     req.on("data", chunk => body += chunk);
     req.on("end", () => {
       const params = new URLSearchParams(body);
-      const index = parseInt(params.get("botIndex"));
+      const action = params.get("action");
+      const [type, idx] = action.split("_");
+      const index = parseInt(idx);
       const ip = params.get(`ip${index}`);
-      const port = parseInt(params.get(`port${index}`));
 
-      console.log(`🌐 User input: Bot ${index} → ${ip}:${port}`);
-
-      if (!usedButtons[index] && ip && port && isValidHost(ip)) {
-        const botName = `SKYBOT_${index}_${Math.floor(1000 + Math.random() * 9000)}`;
+      if (type === "launch" && !usedButtons[index] && ip && isIpPortFormat(ip)) {
         usedButtons[index] = true;
-        botDetails[index] = { ip, port, name: botName };
+        botDetails[index] = { ip };
         saveButtonData();
-
-        launchBot(ip, port, index);
-
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end(`<!DOCTYPE html>
-<html>
-  <head><title>Bot Launched</title></head>
-  <body style="background:#111;color:#0f0;font-family:sans-serif;text-align:center;padding-top:20vh;">
-    <h1>✅ Bot Launched!</h1>
-    <p>Bot <strong>${botName}</strong> is connecting to:</p>
-    <p><code>${ip}:${port}</code></p>
-    <a href="/" style="color:cyan;text-decoration:underline;">← Go back</a>
-  </body>
-</html>`);
-      } else {
-        res.writeHead(400, { "Content-Type": "text/html" });
-        res.end(`<h2 style="color:red;text-align:center;padding-top:20vh;">❌ Invalid IP or Already Used</h2><p style="text-align:center;"><a href="/">Back</a></p>`);
+        launchBot(ip, index);
       }
+
+      if (type === "edit" && ip && isIpPortFormat(ip)) {
+        console.log(`✏️ Editing bot ${index} to ${ip}`);
+        if (activeBots[index]) activeBots[index].quit();
+        botDetails[index] = { ip };
+        saveButtonData();
+        launchBot(ip, index);
+      }
+
+      if (type === "cancel") {
+        console.log(`🛑 Cancelled bot ${index}`);
+        if (activeBots[index]) activeBots[index].quit();
+        usedButtons[index] = false;
+        botDetails[index] = null;
+        activeBots[index] = null;
+        saveButtonData();
+      }
+
+      res.writeHead(302, { Location: "/" });
+      res.end();
     });
   }
 }).listen(PORT, () => {
-  console.log(`🌐 SKYBOT Panel running on port ${PORT}`);
+  console.log(`🌐 SKYBOT Panel running at http://localhost:${PORT}`);
 });
