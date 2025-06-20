@@ -79,6 +79,12 @@ function startMovement(bot) {
   }, 5000);
 }
 
+let dm;
+try {
+  dm = require("./discord_alert.js");
+} catch (e) {
+  console.log("⚠️ Discord DM module failed to load. Continuing without alerts.");
+}
 // === Fake Port for Render & Hosting ===
 require("http").createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
