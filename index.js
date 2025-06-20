@@ -3,7 +3,6 @@ const fs = require("fs");
 const http = require("http");
 const PORT = process.env.PORT || 3000;
 
-// Auto-install mineflayer if missing
 const mineflayer = (() => {
   try { return require("mineflayer"); }
   catch (e) {
@@ -13,26 +12,32 @@ const mineflayer = (() => {
   }
 })();
 
-// Load saved button states
 const DATA_FILE = "button_data.json";
 let usedButtons = Array(10).fill(false);
+let botDetails = Array(10).fill(null);
+
+// Load saved state
 try {
   if (fs.existsSync(DATA_FILE)) {
-    usedButtons = JSON.parse(fs.readFileSync(DATA_FILE));
+    const data = JSON.parse(fs.readFileSync(DATA_FILE));
+    usedButtons = data.usedButtons || usedButtons;
+    botDetails = data.botDetails || botDetails;
   }
 } catch (err) {
-  console.error("❌ Failed to load button state:", err);
+  console.error("❌ Failed to load saved state:", err);
 }
 
-// Save button states
 function saveButtonData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(usedButtons));
+  fs.writeFileSync(DATA_FILE, JSON.stringify({ usedButtons, botDetails }, null, 2));
 }
 
-// Store active bots
 const activeBots = [];
 
-// Launch a bot
+function isValidHost(ip) {
+  // Simple hostname validation
+  return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ip);
+}
+
 function launchBot(host, port, botId = 0, onSuccess = () => {}) {
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
   console.log(`🚀 Launching bot ${botName} on ${host}:${port}`);
@@ -42,6 +47,9 @@ function launchBot(host, port, botId = 0, onSuccess = () => {}) {
 
   bot.once("login", () => {
     console.log(`✅ [${botName}] Logged in.`);
+    usedButtons[botId] = true;
+    botDetails[botId] = { ip: host, port, name: botName };
+    saveButtonData();
     onSuccess();
   });
 
@@ -52,23 +60,20 @@ function launchBot(host, port, botId = 0, onSuccess = () => {}) {
 
   bot.on("end", () => {
     console.log(`🔁 [${botName}] Disconnected. Rejoining in 1s...`);
-    setTimeout(() => launchBot(host, port, botId, onSuccess), 1000);
+    setTimeout(() => launchBot(host, port, botId), 1000);
   });
 
   bot.on("kicked", reason => console.log(`⛔ [${botName}] Kicked: ${reason}`));
   bot.on("error", err => console.log(`❌ [${botName}] Error: ${err.message}`));
 }
 
-// Simulate movement
 function startMovement(bot) {
   const moves = ["forward", "back", "left", "right"];
   let moving = false;
-
   setInterval(() => {
     if (!bot || !bot.entity) return;
     const dir = moves[Math.floor(Math.random() * moves.length)];
     const dur = Math.floor(Math.random() * 3000) + 1000;
-
     if (moving) {
       moves.forEach(m => bot.setControlState(m, false));
       bot.setControlState("jump", false);
@@ -83,13 +88,12 @@ function startMovement(bot) {
         moving = false;
       }, dur);
     }
-
     const yaw = Math.random() * 2 * Math.PI;
     bot.look(yaw, 0, true);
   }, 5000);
 }
 
-// Web panel server
+// === HTML Panel ===
 http.createServer((req, res) => {
   if (req.method === "GET") {
     const html = `<!DOCTYPE html>
@@ -111,13 +115,13 @@ http.createServer((req, res) => {
   </style>
 </head>
 <body>
-  <h1>🚀 SKYBOT Launcher</h1>
+  <h1>SKYBOT Launcher</h1>
   ${Array.from({ length: 10 }).map((_, i) => `
     <form method="POST">
-      <input name="ip${i}" placeholder="IP ${i + 1}" required>
-      <input name="port${i}" placeholder="Port ${i + 1}" required>
-      <button type="submit" name="botIndex" value="${i}" ${usedButtons[i] ? "disabled" : ""}>
-        ${usedButtons[i] ? "Used" : `Send Bot ${i + 1}`}
+      <input name="ip${i}" placeholder="IP ${i+1}" required>
+      <input name="port${i}" placeholder="Port ${i+1}" required>
+      <button type="submit" name="botIndex" value="${i}" ${usedButtons[i] ? 'disabled' : ''}>
+        ${usedButtons[i] ? 'Used (' + (botDetails[i]?.name || '?') + ')' : `Send Bot ${i+1}`}
       </button>
     </form>
   `).join('')}
@@ -134,13 +138,12 @@ http.createServer((req, res) => {
       const ip = params.get(`ip${index}`);
       const port = parseInt(params.get(`port${index}`));
 
-      console.log(`🌐 User requested bot ${index} to ${ip}:${port}`);
+      console.log(`🌐 User input: Bot ${index} to ${ip}:${port}`);
 
-      if (ip && port && !usedButtons[index]) {
-        launchBot(ip, port, index, () => {
-          usedButtons[index] = true;
-          saveButtonData();
-        });
+      if (!usedButtons[index] && ip && port && isValidHost(ip)) {
+        launchBot(ip, port, index);
+      } else {
+        console.log(`❌ Invalid input or already used.`);
       }
 
       res.writeHead(302, { Location: "/" });
@@ -148,5 +151,5 @@ http.createServer((req, res) => {
     });
   }
 }).listen(PORT, () => {
-  console.log(`🌐 Web Panel running on port ${PORT}`);
+  console.log(`🌐 SKYBOT Panel running on port ${PORT}`);
 });
