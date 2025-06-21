@@ -3,12 +3,10 @@ const http = require("http");
 const { execSync } = require("child_process");
 
 const PORT = process.env.PORT || 3000;
-const BOT_LIMIT = 5;
-const USER_LIMIT = 5;
-const SESSION_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+const SESSION_TIMEOUT = 15 * 60 * 1000;
 
 const DATA_FILE = "button_data.json";
-const SESSIONS = {}; // sessionToken -> { username, created }
+const SESSIONS = {};
 
 const mineflayer = (() => {
   try { return require("mineflayer"); }
@@ -19,13 +17,13 @@ const mineflayer = (() => {
 })();
 
 let data = {
-  usedButtons: Array(BOT_LIMIT).fill(false),
-  botDetails: Array(BOT_LIMIT).fill(null),
-  users: {} // username: password
+  usedButtons: Array(1).fill(false),
+  botDetails: Array(1).fill(null),
+  users: {}
 };
-let activeBots = Array(BOT_LIMIT).fill(null);
-let botStatus = Array(BOT_LIMIT).fill("Offline");
-let userLogs = {}; // { username: [logs...] }
+let activeBots = Array(1).fill(null);
+let botStatus = Array(1).fill("Offline");
+let userLogs = {};
 
 if (fs.existsSync(DATA_FILE)) {
   try { data = JSON.parse(fs.readFileSync(DATA_FILE)); } catch {}
@@ -48,10 +46,9 @@ function launchBot(ipPort, botId) {
   const botName = `SKYBOT_${botId}_${Math.floor(Math.random() * 9999)}`;
   const bot = mineflayer.createBot({ host, port: parseInt(port || 25565), username: botName });
   activeBots[botId] = bot;
-
-  logToUser(username, `Launching bot ${botName} on ${host}:${port}`);
   botStatus[botId] = "Online";
 
+  logToUser(username, `Launching bot ${botName} on ${host}:${port}`);
   bot.on("login", () => logToUser(username, `[${botName}] Logged in`));
   bot.on("spawn", () => logToUser(username, `[${botName}] Spawned`));
   bot.on("end", () => {
@@ -104,7 +101,7 @@ http.createServer((req, res) => {
       if (!user || !pass) return res.end("❌ Username & Password required");
 
       if (type === "register") {
-        if (Object.keys(data.users).length >= USER_LIMIT) return res.end("❌ Max users reached");
+        if (Object.keys(data.users).length >= 5) return res.end("❌ Max users reached");
         if (data.users[user]) return res.end("❌ User already exists");
         data.users[user] = pass;
         saveData();
@@ -121,7 +118,7 @@ http.createServer((req, res) => {
 
   if (req.method === "POST" && req.url === "/action" && username) {
     parseBody(req, p => {
-      const index = parseInt(p.get("index"));
+      const index = 0;
       const act = p.get("act");
       const ip = p.get("ip");
 
@@ -152,6 +149,12 @@ http.createServer((req, res) => {
         activeBots[index] = null;
         saveData();
         return res.end("🛑 Cancelled");
+      }
+
+      if (act === "reconnect" && data.botDetails[index]?.owner === username) {
+        if (activeBots[index]) activeBots[index].quit();
+        setTimeout(() => launchBot(data.botDetails[index].ip, index), 1000);
+        return res.end("🔁 Reconnecting");
       }
 
       if (act === "logout") {
@@ -185,20 +188,25 @@ function renderHTML(user) {
     <p id="msg"></p>
   `;
 
+  const i = data.botDetails.findIndex(d => d?.owner === user);
+  const index = i === -1 ? data.usedButtons.findIndex(u => !u) : i;
+  const d = data.botDetails[index];
+  const s = botStatus[index] === "Online" ? `<span class='green'>Online</span>` : `<span class='red'>Offline</span>`;
+  const ip = d?.ip || "";
+  const isOwner = d?.owner === user;
+
   const panel = `
     <h2>Welcome, ${user} <button onclick="send(null, 'logout')">Logout</button></h2>
-    ${Array.from({ length: BOT_LIMIT }).map((_, i) => {
-      const d = data.botDetails[i];
-      const s = botStatus[i] === "Online" ? `<span class='green'>Online</span>` : `<span class='red'>Offline</span>`;
-      const isOwner = d?.owner === user;
-      return `<div class="box">
-        <input id="ip${i}" value="${d?.ip || ''}" placeholder="IP:Port" ${!isOwner && d ? 'disabled' : ''}>
-        ${!d ? `<button onclick="send(${i},'launch')">Send</button>` : isOwner ? `
-          <button onclick="send(${i},'edit')">Edit</button>
-          <button onclick="send(${i},'cancel')">Cancel</button>` : '<button disabled>In Use</button>'}
-        Status: ${s}
-      </div>`;
-    }).join("")}
+    <div class="box">
+      <input id="ip${index}" value="${ip}" placeholder="IP:Port" ${!isOwner && d ? 'disabled' : ''}>
+      ${!d ? `<button onclick="send(${index},'launch')">Send</button>` :
+        isOwner ? `
+          <button onclick="send(${index},'edit')">Edit</button>
+          <button onclick="send(${index},'cancel')">Cancel</button>
+          <button onclick="send(${index},'reconnect')">Reconnect</button>` :
+        '<button disabled>In Use</button>'}
+      Status: ${s}
+    </div>
     <h3>Your Bot Logs</h3>
     <textarea readonly id="logs" class="log"></textarea>
   `;
