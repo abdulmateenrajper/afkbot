@@ -15,23 +15,21 @@ const mineflayer = (() => {
 const BOT_LIMIT = 5;
 const DATA_FILE = "button_data.json";
 let usedButtons = Array(BOT_LIMIT).fill(false);
-let botDetails = Array(BOT_LIMIT).fill(null);
+let botDetails = Array(BOT_LIMIT).fill(null); // { ip: 'x.x.x.x:port', ownerIP: 'x.x.x.x' }
 let activeBots = Array(BOT_LIMIT).fill(null);
 let botStatus = Array(BOT_LIMIT).fill("off");
-
-const IP_BLACKLIST = ["127.0.0.1", "localhost", "0.0.0.0"];
 
 function isIpPortFormat(input) {
   return /^[a-zA-Z0-9.-]+:\d+$/.test(input);
 }
 
-function isBlacklisted(ipPort) {
-  const host = ipPort.split(":")[0];
-  return IP_BLACKLIST.includes(host);
-}
-
 function isDuplicate(ipPort, index) {
   return botDetails.some((b, i) => b?.ip === ipPort && i !== index);
+}
+
+function parseHost(input) {
+  const parts = input.split(":");
+  return { host: parts[0], port: parseInt(parts[1]) };
 }
 
 try {
@@ -51,15 +49,10 @@ function saveButtonData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ usedButtons, botDetails }, null, 2));
 }
 
-function parseHost(input) {
-  const parts = input.split(":");
-  return { host: parts[0], port: parseInt(parts[1]) };
-}
-
 function launchBot(ipPort, botId = 0, attempt = 0, totalFailures = 0) {
   const { host, port } = parseHost(ipPort);
   const botName = `SKYBOT_${botId}_${Math.floor(1000 + Math.random() * 9000)}`;
-  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1}, fails: ${totalFailures})`);
+  console.log(`🚀 Launching bot ${botName} on ${host}:${port} (try ${attempt + 1})`);
 
   const bot = mineflayer.createBot({ host, port, username: botName });
   activeBots[botId] = bot;
@@ -119,6 +112,8 @@ function startMovement(bot) {
 }
 
 http.createServer((req, res) => {
+  const userIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+
   if (req.method === "GET" && req.url === "/") {
     const html = `<!DOCTYPE html>
 <html>
@@ -154,24 +149,29 @@ http.createServer((req, res) => {
 </head>
 <body>
   <h1>🚀 SKYBOT Java Edition Panel</h1>
-  ${Array.from({ length: BOT_LIMIT }).map((_, i) => `
-    <form method="POST">
-      <p><img id="status${i}" class="status" src="${botStatus[i] === 'on'
-        ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Yes_Check_Circle.svg/32px-Yes_Check_Circle.svg.png'
-        : 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Close_icon_red.svg/32px-Close_icon_red.svg.png'}">
-        <span id="ip${i}">${botDetails[i]?.ip || '—'}</span>
-      </p>
-      <input name="ip${i}" placeholder="IP:Port" value="${botDetails[i]?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
-      <div class="row">
-        ${!usedButtons[i] ? `
-          <button class="btn" type="submit" name="action" value="launch_${i}">Send Bot</button>
-        ` : `
-          <button class="btn" type="submit" name="action" value="edit_${i}">Edit</button>
-          <button class="btn" type="submit" name="action" value="cancel_${i}">Cancel</button>
-        `}
-      </div>
-    </form>
-  `).join('')}
+  ${Array.from({ length: BOT_LIMIT }).map((_, i) => {
+    const detail = botDetails[i];
+    const isOwner = detail?.ownerIP === userIP;
+    return `
+      <form method="POST">
+        <p><img id="status${i}" class="status" src="${botStatus[i] === 'on'
+          ? 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Yes_Check_Circle.svg/32px-Yes_Check_Circle.svg.png'
+          : 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Close_icon_red.svg/32px-Close_icon_red.svg.png'}">
+          <span id="ip${i}">${detail?.ip || '—'}</span>
+        </p>
+        <input name="ip${i}" placeholder="IP:Port" value="${detail?.ip || ''}" ${usedButtons[i] ? 'readonly' : ''}>
+        <div class="row">
+          ${!usedButtons[i] ? `
+            <button class="btn" type="submit" name="action" value="launch_${i}">Send Bot</button>
+          ` : isOwner ? `
+            <button class="btn" type="submit" name="action" value="edit_${i}">Edit</button>
+            <button class="btn" type="submit" name="action" value="cancel_${i}">Cancel</button>
+          ` : `
+            <button class="btn" disabled>🔒 Locked</button>
+          `}
+        </div>
+      </form>`;
+  }).join('')}
 </body>
 </html>`;
     res.writeHead(200, { "Content-Type": "text/html" });
@@ -193,27 +193,27 @@ http.createServer((req, res) => {
       const index = parseInt(idx);
       const ip = params.get(`ip${index}`);
 
-      if (!isIpPortFormat(ip) || isBlacklisted(ip) || isDuplicate(ip, index)) {
-        console.log(`❌ Rejected IP: ${ip}`);
+      if (!isIpPortFormat(ip) || isDuplicate(ip, index)) {
+        console.log(`❌ Rejected or duplicate IP: ${ip}`);
         res.writeHead(302, { Location: "/" });
         return res.end();
       }
 
       if (type === "launch" && !usedButtons[index]) {
         usedButtons[index] = true;
-        botDetails[index] = { ip };
+        botDetails[index] = { ip, ownerIP: userIP };
         saveButtonData();
         launchBot(ip, index);
       }
 
-      if (type === "edit") {
+      if (type === "edit" && botDetails[index]?.ownerIP === userIP) {
         if (activeBots[index]) activeBots[index].quit();
-        botDetails[index] = { ip };
+        botDetails[index].ip = ip;
         saveButtonData();
         launchBot(ip, index);
       }
 
-      if (type === "cancel") {
+      if (type === "cancel" && botDetails[index]?.ownerIP === userIP) {
         if (activeBots[index]) activeBots[index].quit();
         usedButtons[index] = false;
         botDetails[index] = null;
@@ -227,5 +227,5 @@ http.createServer((req, res) => {
     });
   }
 }).listen(PORT, () => {
-  console.log(`🌐 SKYBOT running on http://localhost:${PORT}`);
+  console.log(`🌐 SKYBOT Panel running on port ${PORT}`);
 });
