@@ -198,7 +198,7 @@ function renderHTML(user) {
   const panel = `
     <h2>Welcome, ${user} <button onclick="send(null, 'logout')">Logout</button></h2>
     <div class="box">
-      <input id="ip${index}" value="${ip}" placeholder="IP:Port" ${!isOwner && d ? 'disabled' : ''}>
+      <input id="ip${index}" value="${ip}" placeholder="LOYALSMP56734:62808" ${!isOwner && d ? 'disabled' : ''}>
       ${!d ? `<button onclick="send(${index},'launch')">Send</button>` :
         isOwner ? `
           <button onclick="send(${index},'edit')">Edit</button>
